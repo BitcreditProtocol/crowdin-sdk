@@ -41,14 +41,11 @@ String generationContent(
     required Map<String, Object?> arbResource,
     required L10nConfig l10nConfig}) {
   StringBuffer buffer = StringBuffer();
-  buffer.writeln('''import 'dart:convert';
-
-import '${l10nConfig.outputLocalizationFile}';
+  buffer.writeln('''import '${l10nConfig.outputLocalizationFile}';
 
 import 'package:crowdin_sdk/crowdin_sdk.dart';
 
 import 'package:flutter/widgets.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 class CrowdinLocalization extends ${l10nConfig.outputClass} {
