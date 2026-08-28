@@ -75,6 +75,10 @@ class CrowdinPreviewManager {
       unawaited(
         _subscribeToAllTranslations().catchError(
           (Object error, StackTrace stackTrace) {
+            _connected = false;
+            _subscribedEvents.clear();
+            _subscribedLanguageCodes.clear();
+            _subscriptionsInFlight.clear();
             _onConnectionError?.call(error, stackTrace);
           },
         ),
@@ -379,9 +383,14 @@ class CrowdinPreviewManager {
       _onSubscriptionProgress?.call(langCode, completed, total);
     }
 
-    if (allTicketsCreated) {
-      _subscribedLanguageCodes.add(langCode);
+    if (!allTicketsCreated) {
+      throw CrowdinException(
+        'Crowdin real-time preview subscription failed for $langCode: '
+        'could not create a WebSocket ticket for one or more translations.',
+      );
     }
+
+    _subscribedLanguageCodes.add(langCode);
     CrowdinLogger.printLog(
       'Crowdin real-time preview subscriptions ready for $langCode',
     );

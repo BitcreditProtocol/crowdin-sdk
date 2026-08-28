@@ -5,6 +5,7 @@ import 'package:crowdin_sdk/crowdin_sdk.dart';
 import 'package:crowdin_sdk/src/crowdin_api.dart';
 import 'package:crowdin_sdk/src/real_time_preview/crowdin_oauth.dart';
 import 'package:crowdin_sdk/src/real_time_preview/crowdin_preview_manager.dart';
+import 'package:crowdin_sdk/src/exceptions/crowdin_exceptions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:crowdin_sdk/src/common/gen_l10n_types.dart';
@@ -16,12 +17,16 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import '../test_arb.dart';
 
 class _FakeCrowdinApi extends CrowdinApi {
+  int getMetadataCalls = 0;
+  bool failWebsocketTicket = false;
+
   @override
   Future<Map<String, dynamic>?> getMetadata({
     required String accessToken,
     required String distributionHash,
     String? organizationName,
   }) async {
+    getMetadataCalls++;
     return {
       'data': {
         'project': {'id': '1', 'wsHash': 'hash'},
@@ -37,6 +42,7 @@ class _FakeCrowdinApi extends CrowdinApi {
     required String event,
     String? organizationName,
   }) async {
+    if (failWebsocketTicket) return null;
     return 'ticket';
   }
 }
@@ -432,6 +438,61 @@ void main() {
       await pumpEventQueue();
 
       expect(connectionErrorCalls, 0);
+    });
+
+    test(
+        'a missing websocket ticket propagates an error and does not report subscriptions ready',
+        () async {
+      manager.finalMapping = {'greeting': '42'};
+      fakeApi.failWebsocketTicket = true;
+
+      var subscriptionsReadyCalls = 0;
+
+      final future = manager.start(
+        onTranslationUpdate: (_) {},
+        onConnectionError: (_, __) {},
+        onSubscriptionProgress: (_, __, ___) {},
+        onSubscriptionsReady: () => subscriptionsReadyCalls++,
+      );
+
+      await expectLater(future, throwsA(isA<CrowdinException>()));
+      expect(subscriptionsReadyCalls, 0);
+    });
+
+    test(
+        'a subscription failure after a locale change resets connection state so retrying with the same manager instance reconnects',
+        () async {
+      manager.finalMapping = {'greeting': '42'};
+
+      var connectionErrorCalls = 0;
+      Future<void> startAndTrackErrors() {
+        return manager.start(
+          onTranslationUpdate: (_) {},
+          onConnectionError: (_, __) => connectionErrorCalls++,
+          onSubscriptionProgress: (_, __, ___) {},
+          onSubscriptionsReady: () {},
+        );
+      }
+
+      await startAndTrackErrors();
+      expect(fakeApi.getMetadataCalls, 1);
+
+      // Locale change while connected triggers a re-subscription that fails.
+      fakeApi.failWebsocketTicket = true;
+      manager.setPreviewArb(AppResourceBundle({
+        '@@locale': 'fr',
+        'greeting': 'Bonjour',
+      }));
+      await pumpEventQueue();
+
+      expect(connectionErrorCalls, 1);
+
+      // Retry with the same manager instance should perform a real reconnect
+      // instead of silently no-oping because the manager still thinks it's
+      // connected.
+      fakeApi.failWebsocketTicket = false;
+      await expectLater(startAndTrackErrors(), completes);
+      expect(fakeApi.getMetadataCalls, 2);
     });
   });
 }
