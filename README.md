@@ -8,6 +8,10 @@
 
 # Crowdin Flutter SDK
 
+> **Note:** This is the [Bitcredit-maintained fork](https://github.com/BitcreditProtocol/crowdin-sdk) of the upstream
+> [crowdin/flutter-sdk](https://github.com/crowdin/flutter-sdk), used by the BitcreditProtocol wallet app.
+> See [FORK_NOTES.md](FORK_NOTES.md) for what's different and how it's kept in sync with upstream.
+
 The Crowdin Flutter SDK enables Over-The-Air (OTA) translation updates, delivering new translations from your Crowdin project directly to users without requiring app store updates. The SDK works on top of Flutter's standard localization system (`flutter_localizations`), providing a seamless bridge between your local ARB files and Crowdin's Content Delivery Network.
 
 <div align="center">

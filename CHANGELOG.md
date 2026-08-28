@@ -3,9 +3,31 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## 1.1.2+bitcredit.1
+
+Bitcredit-maintained fork, merged with upstream 1.1.2 (`8fd302d`). See [FORK_NOTES.md](FORK_NOTES.md) for details.
+
+fix(realtime): propagate WebSocket subscription ticket failures as errors instead of reporting subscriptions ready
+
+fix(realtime): reset connection/subscription state on a `setPreviewArb` subscription failure so Retry reconnects
+
+chore: restore fork documentation (FORK_NOTES, CHANGELOG, CODE_OF_CONDUCT, CONTRIBUTING) and mark the package `publish_to: none`
+
 ## 1.1.2
 
 fix: allow the `intl` 0.20.x line used by current Flutter SDK releases
+
+## 1.1.1+bitcredit.1
+
+Bitcredit-maintained fork, based on upstream 1.1.1 (`e84aab36acde7210480e1f3803b1986d9ef6c3cd`). See [FORK_NOTES.md](FORK_NOTES.md) for details.
+
+fix: allow the `intl` 0.20.x line used by current Flutter SDK releases
+
+fix(realtime): correct OAuth scope, event ids and locale mapping
+
+feat(realtime): add opt-in preview session lifecycle
+
+fix(realtime): handle clean websocket closure
 
 ## 1.1.1
 

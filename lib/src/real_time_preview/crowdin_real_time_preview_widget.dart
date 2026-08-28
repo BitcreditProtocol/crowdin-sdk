@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../crowdin_sdk.dart';
@@ -6,11 +8,13 @@ import '../../crowdin_sdk.dart';
 /// translation updates receiving
 class CrowdinRealTimePreviewWidget extends StatefulWidget {
   final Widget child;
+  final bool autoStart;
 
   const CrowdinRealTimePreviewWidget({
-    Key? key,
     required this.child,
-  }) : super(key: key);
+    this.autoStart = true,
+    super.key,
+  });
 
   @override
   State<CrowdinRealTimePreviewWidget> createState() =>
@@ -25,11 +29,22 @@ class _CrowdinRealTimePreviewWidgetState
   @override
   void initState() {
     super.initState();
-    if (Crowdin.withRealTimeUpdates) {
-      Crowdin.crowdinPreviewManager.init((key) {
-        _rebuildTree(key);
-      });
+    if (Crowdin.realTimePreviewAvailable) {
+      Crowdin.realTimePreviewRevision.addListener(_handleTranslationUpdate);
+      if (widget.autoStart) {
+        unawaited(
+          Crowdin.enableRealTimePreview().catchError(
+            (Object error) => debugPrint(
+              'Failed to enable Crowdin real-time preview: $error',
+            ),
+          ),
+        );
+      }
     }
+  }
+
+  void _handleTranslationUpdate() {
+    if (mounted) _rebuildTree('');
   }
 
   // rebuild every widget in the tree without calling setState()
@@ -57,6 +72,12 @@ class _CrowdinRealTimePreviewWidgetState
     element
       ..markNeedsBuild()
       ..visitChildren((element) => _elementRebuildVisitor(element, textKey));
+  }
+
+  @override
+  void dispose() {
+    Crowdin.realTimePreviewRevision.removeListener(_handleTranslationUpdate);
+    super.dispose();
   }
 
   @override

@@ -39,4 +39,12 @@ void main() {
           const Locale('xx', 'YY'));
     });
   });
+
+  group('CrowdinMapper.toCrowdinLanguageCode', () {
+    test('maps Flutter locales to Crowdin real-time language codes', () {
+      expect(CrowdinMapper.toCrowdinLanguageCode(const Locale('en')), 'en');
+      expect(CrowdinMapper.toCrowdinLanguageCode(const Locale('es')), 'es-ES');
+      expect(CrowdinMapper.toCrowdinLanguageCode(const Locale('pt')), 'pt-PT');
+    });
+  });
 }

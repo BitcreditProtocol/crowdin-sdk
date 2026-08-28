@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:crowdin_sdk/crowdin_sdk.dart';
 import 'package:flutter/material.dart';
 import 'l10n/app_localizations.dart';
@@ -223,8 +221,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                     currentLocale = locale;
                                   });
                                 },
-                              ))
-                          .toList(),
+                              )),
                     ],
                     onChanged: (item) {},
                   ),

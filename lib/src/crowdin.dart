@@ -2,12 +2,15 @@ import 'dart:convert';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:crowdin_sdk/src/crowdin_api.dart';
-import 'package:crowdin_sdk/src/crowdin_request_limiter.dart';
-import 'package:crowdin_sdk/src/crowdin_storage.dart';
 import 'package:crowdin_sdk/src/crowdin_extractor.dart';
 import 'package:crowdin_sdk/src/crowdin_mapper.dart';
+import 'package:crowdin_sdk/src/crowdin_request_limiter.dart';
+import 'package:crowdin_sdk/src/crowdin_storage.dart';
 import 'package:crowdin_sdk/src/exceptions/crowdin_exceptions.dart';
 import 'package:crowdin_sdk/src/real_time_preview/crowdin_preview_manager.dart';
+import 'package:crowdin_sdk/src/real_time_preview/crowdin_preview_session.dart';
+import 'package:crowdin_sdk/src/real_time_preview/crowdin_preview_state.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 import 'common/gen_l10n_types.dart';
@@ -51,6 +54,21 @@ class Crowdin {
   static bool _withRealTimeUpdates = false;
 
   static bool get withRealTimeUpdates => _withRealTimeUpdates;
+
+  static bool _realTimePreviewAvailable = false;
+
+  static bool get realTimePreviewAvailable => _realTimePreviewAvailable;
+
+  static CrowdinPreviewSession _previewSession = CrowdinPreviewSession(
+    start: () => Future.error(
+      StateError('Crowdin real-time preview is not configured.'),
+    ),
+  );
+
+  static ValueListenable<CrowdinPreviewState> get realTimePreviewState =>
+      _previewSession.state;
+
+  static final ValueNotifier<int> realTimePreviewRevision = ValueNotifier(0);
 
   static Map<String, dynamic>? _manifest;
 
@@ -118,13 +136,78 @@ class Crowdin {
           .toList();
     }
 
-    _withRealTimeUpdates = withRealTimeUpdates;
-
     _authConfig = authConfigurations;
+    _withRealTimeUpdates = false;
+    _realTimePreviewAvailable = withRealTimeUpdates && _authConfig != null;
+    _previewSession = CrowdinPreviewSession(
+      start: () => Future.error(
+        StateError('Crowdin real-time preview is not configured.'),
+      ),
+    );
 
-    if (withRealTimeUpdates && _authConfig != null) {
+    if (_realTimePreviewAvailable) {
       setUpRealTimePreviewManager(_authConfig!);
+
+      late final CrowdinPreviewSession previewSession;
+      previewSession = CrowdinPreviewSession(
+        start: () async {
+          final arb = _arb;
+          if (arb == null) {
+            throw CrowdinException(
+              'Translations must be loaded before enabling real-time preview.',
+            );
+          }
+
+          crowdinPreviewManager.setPreviewArb(arb);
+          _withRealTimeUpdates = true;
+
+          try {
+            await crowdinPreviewManager.start(
+              onTranslationUpdate: (_) {
+                realTimePreviewRevision.value++;
+              },
+              onConnectionError: (error, stackTrace) {
+                _withRealTimeUpdates = false;
+                CrowdinLogger.printLog(
+                  'Crowdin real-time preview connection failed: $error',
+                );
+                previewSession.markError(error);
+              },
+              onSubscriptionProgress: (languageCode, completed, total) {
+                previewSession.updateSubscriptionProgress(
+                  languageCode: languageCode,
+                  completed: completed,
+                  total: total,
+                );
+              },
+              onSubscriptionsReady: previewSession.markSubscriptionsReady,
+            );
+          } catch (_) {
+            _withRealTimeUpdates = false;
+            rethrow;
+          }
+        },
+        cancel: () async {
+          _withRealTimeUpdates = false;
+          await crowdinPreviewManager.cancelStart();
+        },
+      );
+      _previewSession = previewSession;
     }
+  }
+
+  static Future<void> enableRealTimePreview() {
+    if (!_realTimePreviewAvailable) {
+      return Future.error(
+        StateError('Crowdin real-time preview is not configured.'),
+      );
+    }
+
+    return _previewSession.enable();
+  }
+
+  static Future<void> cancelRealTimePreviewActivation() {
+    return _previewSession.cancel();
   }
 
   static void checkManifestForLocale(Locale locale) {
@@ -222,7 +305,7 @@ class Crowdin {
       _arb = null;
       return;
     }
-    if (_withRealTimeUpdates) {
+    if (_withRealTimeUpdates && _arb != null) {
       crowdinPreviewManager.setPreviewArb(_arb!);
     }
   }
