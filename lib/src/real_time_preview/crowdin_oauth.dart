@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:app_links/app_links.dart';
+import 'package:crowdin_sdk/src/exceptions/crowdin_exceptions.dart';
 import 'package:oauth2/oauth2.dart' as oauth2;
 import 'package:url_launcher/url_launcher.dart';
 
@@ -9,51 +10,105 @@ import 'crowdin_auth_config.dart';
 const String _kAuthorizationEndpoint =
     'https://accounts.crowdin.com/oauth/authorize';
 const String _kTokenEndpoint = 'https://accounts.crowdin.com/oauth/token';
+const Duration _kAuthorizationTimeout = Duration(minutes: 5);
 
 class CrowdinOauth {
   final CrowdinAuthConfig config;
-  final Future<void> Function(oauth2.Credentials) onAuthenticated;
 
-  CrowdinOauth(this.config, this.onAuthenticated);
+  CrowdinOauth(this.config);
 
-  late oauth2.Client _client;
   StreamSubscription? _sub;
+  Future<oauth2.Credentials>? _authentication;
+  Completer<oauth2.Credentials>? _completer;
 
-  Future<void> authenticate() async {
+  Future<oauth2.Credentials> authenticate() {
+    return _authentication ??= _authenticate();
+  }
+
+  Future<oauth2.Credentials> _authenticate() async {
     final authorizationEndpoint = Uri.parse(_kAuthorizationEndpoint);
     final tokenEndpoint = Uri.parse(_kTokenEndpoint);
+    final completer = Completer<oauth2.Credentials>();
+    _completer = completer;
 
-    var grant = oauth2.AuthorizationCodeGrant(
+    final grant = oauth2.AuthorizationCodeGrant(
       config.clientId,
       authorizationEndpoint,
       tokenEndpoint,
       secret: config.clientSecret,
       basicAuth: false,
     );
-    final _uriLinkStream = AppLinks().uriLinkStream;
-
-    var authorizationUrl = grant.getAuthorizationUrl(
-        Uri.parse(config.redirectUri),
-        scopes: ['project.translation:read']);
-
-    _sub = _uriLinkStream.listen((Uri? uri) async {
-      if (uri != null && uri.toString().startsWith(config.redirectUri)) {
-        var client =
-            await grant.handleAuthorizationResponse(uri.queryParameters);
-
-        _client = client;
-        dispose();
-        onAuthenticated(_client.credentials);
-      }
-    });
-
-    await launchUrl(
-      authorizationUrl,
-      mode: LaunchMode.externalApplication,
+    final authorizationUrl = grant.getAuthorizationUrl(
+      Uri.parse(config.redirectUri),
+      scopes: ['project.translation:read'],
     );
+
+    void completeWithError(Object error, StackTrace stackTrace) {
+      dispose();
+      if (!completer.isCompleted) {
+        completer.completeError(error, stackTrace);
+      }
+    }
+
+    _sub = AppLinks().uriLinkStream.listen(
+      (Uri uri) async {
+        if (!uri.toString().startsWith(config.redirectUri)) return;
+
+        try {
+          final client =
+              await grant.handleAuthorizationResponse(uri.queryParameters);
+          dispose();
+          if (!completer.isCompleted) {
+            completer.complete(client.credentials);
+          }
+        } catch (error, stackTrace) {
+          completeWithError(error, stackTrace);
+        }
+      },
+      onError: (Object error, StackTrace stackTrace) {
+        completeWithError(error, stackTrace);
+      },
+    );
+
+    try {
+      final launched = await launchUrl(
+        authorizationUrl,
+        mode: LaunchMode.externalApplication,
+      );
+      if (!launched) {
+        throw CrowdinException('Could not open Crowdin authorization.');
+      }
+    } catch (error, stackTrace) {
+      completeWithError(error, stackTrace);
+    }
+
+    try {
+      return await completer.future.timeout(_kAuthorizationTimeout);
+    } on TimeoutException {
+      dispose();
+      rethrow;
+    } finally {
+      if (identical(_completer, completer)) {
+        _completer = null;
+      }
+    }
+  }
+
+  void cancel() {
+    final completer = _completer;
+    dispose();
+    if (completer != null && !completer.isCompleted) {
+      completer.completeError(
+        CrowdinException('Crowdin authorization was canceled.'),
+      );
+    }
   }
 
   void dispose() {
-    _sub?.cancel();
+    final subscription = _sub;
+    _sub = null;
+    if (subscription != null) {
+      unawaited(subscription.cancel());
+    }
   }
 }
