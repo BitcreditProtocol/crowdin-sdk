@@ -1,8 +1,8 @@
 name: crowdin_sdk
 description: Crowdin Flutter SDK for instant translation delivery Over-The-Air directly to your application
-version: 1.1.1
-repository: https://github.com/crowdin/flutter-sdk
-homepage: https://github.com/crowdin/flutter-sdk
+version: 1.1.1+bitcredit.1
+repository: https://github.com/BitcreditProtocol/crowdin-sdk
+homepage: https://github.com/BitcreditProtocol/crowdin-sdk
 
 environment:
   sdk: '>=3.4.0 <4.0.0'

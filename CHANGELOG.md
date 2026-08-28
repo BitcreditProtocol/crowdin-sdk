@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## 1.1.1+bitcredit.1
+
+Bitcredit-maintained fork, based on upstream 1.1.1 (`e84aab36acde7210480e1f3803b1986d9ef6c3cd`). See [FORK_NOTES.md](FORK_NOTES.md) for details.
+
+fix: allow the `intl` 0.20.x line used by current Flutter SDK releases
+
+fix(realtime): correct OAuth scope, event ids and locale mapping
+
+feat(realtime): add opt-in preview session lifecycle
+
+fix(realtime): handle clean websocket closure
+
 ## 1.1.1
 
 chore: update real-time preview WebSocket event naming
