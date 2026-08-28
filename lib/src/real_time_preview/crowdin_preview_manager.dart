@@ -5,6 +5,7 @@ import 'package:crowdin_sdk/crowdin_sdk.dart';
 import 'package:crowdin_sdk/src/common/gen_l10n_types.dart';
 import 'package:crowdin_sdk/src/crowdin_api.dart';
 import 'package:crowdin_sdk/src/crowdin_logger.dart';
+import 'package:crowdin_sdk/src/crowdin_mapper.dart';
 import 'package:crowdin_sdk/src/exceptions/crowdin_exceptions.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:oauth2/oauth2.dart' as oauth2;
@@ -112,7 +113,12 @@ class CrowdinPreviewManager {
         Map<String, dynamic> messageDecoded = jsonDecode(message);
         Map<String, dynamic> data = messageDecoded['data'];
         String event = messageDecoded['event'];
-        String textId = event.split(':').last;
+        final rawId = event.split(':').last;
+        // WebSocket event format ends with "tr{<id>}" but finalMapping values
+        // are plain "<id>" — strip the tr{...} wrapper so the lookup matches.
+        String textId = rawId.startsWith('tr{') && rawId.endsWith('}')
+            ? rawId.substring(3, rawId.length - 1)
+            : rawId;
         updatePreviewArb(
           id: textId,
           text: data['text'] ?? '',
@@ -139,7 +145,14 @@ class CrowdinPreviewManager {
   }
 
   Future<void> _subscribeToAllTranslations() async {
-    String langCode = previewArb.locale.languageCode;
+    final previewLocale = previewArb.locale;
+    final langCode = CrowdinMapper.toCrowdinLanguageCode(
+      Locale.fromSubtags(
+        languageCode: previewLocale.languageCode,
+        scriptCode: previewLocale.scriptCode,
+        countryCode: previewLocale.countryCode,
+      ),
+    );
     if (_metadata == null) {
       CrowdinLogger.printLog(
           'Something went wrong when subscribing to translations for real-time preview. Metadata is not provided');

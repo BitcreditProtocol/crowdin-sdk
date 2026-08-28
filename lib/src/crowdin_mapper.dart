@@ -4,6 +4,11 @@ import 'dart:ui';
 // https://api.flutter.dev/flutter/flutter_localizations/GlobalMaterialLocalizations-class.html
 
 class CrowdinMapper {
+  /// Returns the language identifier used by Crowdin's API and WebSocket
+  /// events for a Flutter locale.
+  static String toCrowdinLanguageCode(Locale locale) =>
+      mapLocale(locale).toLanguageTag();
+
   static Locale mapLocale(Locale locale) {
     String localeTag = locale.toLanguageTag();
     return _localesMap.containsKey(localeTag)
