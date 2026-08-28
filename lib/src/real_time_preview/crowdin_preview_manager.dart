@@ -34,6 +34,7 @@ class CrowdinPreviewManager {
   Future<void>? _startFuture;
   int _startGeneration = 0;
   bool _connected = false;
+  bool _intentionalClose = false;
   final Set<String> _subscribedEvents = {};
   final Set<String> _subscribedLanguageCodes = {};
   final Map<String, Future<void>> _subscriptionsInFlight = {};
@@ -160,6 +161,7 @@ class CrowdinPreviewManager {
     _auth?.cancel();
     _auth = null;
     _connected = false;
+    _intentionalClose = true;
     _subscribedEvents.clear();
     _subscribedLanguageCodes.clear();
     _subscriptionsInFlight.clear();
@@ -227,6 +229,7 @@ class CrowdinPreviewManager {
     _subscribedEvents.clear();
     _subscribedLanguageCodes.clear();
     _subscriptionsInFlight.clear();
+    _intentionalClose = false;
 
     final channel = _connectWebSocketFn(Uri.parse(_metadata!.wsUrl));
     _channel = channel;
@@ -256,6 +259,19 @@ class CrowdinPreviewManager {
         _subscribedLanguageCodes.clear();
         _subscriptionsInFlight.clear();
         _onConnectionError?.call(error, stackTrace);
+      },
+      onDone: () {
+        if (_intentionalClose) return;
+        _connected = false;
+        _subscribedEvents.clear();
+        _subscribedLanguageCodes.clear();
+        _subscriptionsInFlight.clear();
+        _onConnectionError?.call(
+          CrowdinException(
+            'Crowdin real-time preview connection closed unexpectedly.',
+          ),
+          StackTrace.current,
+        );
       },
     );
 
@@ -395,6 +411,7 @@ class CrowdinPreviewManager {
 
   Future<void> dispose() async {
     _connected = false;
+    _intentionalClose = true;
     _startFuture = null;
     _subscribedEvents.clear();
     _subscribedLanguageCodes.clear();
