@@ -38,3 +38,6 @@ build/
 
 coverage/
 test-results.json
+
+# FVM's local SDK link; .fvmrc, which names the version, is tracked
+.fvm/
